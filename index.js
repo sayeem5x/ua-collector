@@ -1,25 +1,62 @@
-const express = require('express');
-const fs = require('fs');
-const useragent = require('express-useragent');
-const app = express();
 
-app.use(useragent.express());
+const https = require('https');
 
-app.get('/', (req, res) => {
-    const ua = req.headers['user-agent'];
-    const source = req.useragent;
-    let category = 'others';
+module.exports = async (req, res) => {
+  const userAgent = req.headers['user-agent'] || 'Unknown';
+  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+  const platform = detectPlatform(userAgent);
+  const browser = detectBrowser(userAgent);
 
-    if (source.isAndroid) category = 'android';
-    else if (source.isiPhone) category = 'iphone';
-    else if (source.isDesktop) category = 'desktop';
+  const data = JSON.stringify({
+    userAgent: userAgent,
+    platform: platform,
+    browser: browser,
+    ip: ip
+  });
 
-    const data = `${ua} [${source.browser}]
-`;
+  const options = {
+    hostname: 'script.google.com',
+    path: '/macros/s/AKfycbwUJjT1W_uXcg0DJ8xSVIvjySS7tNUYyLL-x5nT2Jp6rMF3bMkTUl03maVNfmMXve5n/exec',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': data.length
+    }
+  };
 
-    fs.appendFileSync(`/tmp/${category}.txt`, data);
+  const googleReq = https.request(options, googleRes => {
+    googleRes.on('data', () => {});
+    googleRes.on('end', () => {
+      res.writeHead(302, {
+        Location: 'https://declareddetect.com/hp2a67q4t?key=2bf6ae3ce8a4eac785ad953214351e62'
+      });
+      res.end();
+    });
+  });
 
-    res.redirect('https://declareddetect.com/hp2a67q4t?key=2bf6ae3ce8a4eac785ad953214351e62');
-});
+  googleReq.on('error', error => {
+    console.error('Error:', error);
+    res.writeHead(302, {
+      Location: 'https://declareddetect.com/hp2a67q4t?key=2bf6ae3ce8a4eac785ad953214351e62'
+    });
+    res.end();
+  });
 
-app.listen(3000);
+  googleReq.write(data);
+  googleReq.end();
+};
+
+function detectPlatform(ua) {
+  if (/android/i.test(ua)) return 'Android';
+  if (/iphone|ipad/i.test(ua)) return 'iPhone';
+  return 'Desktop';
+}
+
+function detectBrowser(ua) {
+  if (/FBAV/i.test(ua)) return 'Facebook App';
+  if (/Chrome/i.test(ua)) return 'Chrome';
+  if (/OPR|Opera Mini/i.test(ua)) return 'Opera Mini';
+  if (/Safari/i.test(ua)) return 'Safari';
+  if (/Firefox/i.test(ua)) return 'Firefox';
+  return 'Unknown';
+}
